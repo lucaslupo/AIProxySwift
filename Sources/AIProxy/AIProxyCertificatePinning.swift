@@ -50,7 +50,33 @@ import Foundation
 /// If you encounter other calls in the wild that do not invoke `urlSession:didReceiveChallenge:` on this class,
 /// please report them to me.
 open class AIProxyCertificatePinningDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
+    
+    /// Completion handler for background session events
+    public var backgroundCompletionHandler: (() -> Void)?
 
+    private var dataMap = [Int: Data]() // track data per task
+
+    public func urlSession(_ session: URLSession,
+                               dataTask: URLSessionDataTask,
+                               didReceive data: Data) {
+            let taskId = dataTask.taskIdentifier
+            if dataMap[taskId] == nil { dataMap[taskId] = Data() }
+            dataMap[taskId]?.append(data)
+        }
+
+        public func urlSession(_ session: URLSession,
+                               task: URLSessionTask,
+                               didCompleteWithError error: Error?) {
+            let taskId = task.taskIdentifier
+            if let error = error {
+                print("Task \(taskId) failed: \(error)")
+            } else if let data = dataMap[taskId] {
+                // Process the response data for this task
+                print("Task \(taskId) completed, received \(data.count) bytes")
+            }
+            dataMap[taskId] = nil
+        }
+    
    public var progressCallback: ((Double) -> Void)?
    
    public func setProgressCallback(_ callback: @escaping (Double) -> Void) {
@@ -87,6 +113,15 @@ open class AIProxyCertificatePinningDelegate: NSObject, URLSessionDelegate, URLS
              totalBytesExpectedToSend > 0 else { return }
        let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
        progressCallback(progress)
+   }
+   
+   // MARK: - Background Session Support
+   
+   public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+       DispatchQueue.main.async {
+           self.backgroundCompletionHandler?()
+           self.backgroundCompletionHandler = nil
+       }
    }
 
    private func answerChallenge(
