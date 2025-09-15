@@ -178,10 +178,83 @@ class BackgroundTaskManager {
 
 ## Troubleshooting
 
-- **Session Not Working**: Ensure your app has the correct background modes enabled in Info.plist
-- **Completion Handler Not Called**: Verify that you've properly implemented the AppDelegate method for background session events
-- **Certificate Pinning Issues**: Background sessions use the same certificate pinning as regular sessions
-- **Network Timeouts**: Background requests may have different timeout behavior than foreground requests
+### Common Issues and Solutions
+
+#### 1. **Live Activity Stops Updating After 4 Seconds**
+
+This is a common issue with background sessions. Here are the solutions:
+
+**Problem**: Background sessions may lose connection when the app goes to background.
+
+**Solutions**:
+
+- Use `AIProxyBackgroundTaskManager` to properly manage background tasks
+- Implement proper AppDelegate background session handling
+- Ensure your app has the correct background modes in Info.plist
+
+```swift
+// In your AppDelegate
+func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String, completionHandler: @escaping () -> Void) {
+    // Store completion handler
+    backgroundCompletionHandlers[identifier] = completionHandler
+
+    // Set up the completion handler on the appropriate delegate
+    if identifier.contains("openai") {
+        AIProxyURLSession.backgroundDelegate.backgroundCompletionHandler = completionHandler
+    }
+}
+
+// In your app's background task
+let backgroundTaskManager = AIProxyBackgroundTaskManager.shared
+let backgroundTaskId = backgroundTaskManager.startBackgroundTask(name: "AI Request")
+
+// Perform your AI request
+do {
+    let response = try await openAIService.chatCompletion(request: request)
+    // Handle response
+} catch {
+    // Handle error
+} finally {
+    backgroundTaskManager.endBackgroundTask(identifier: backgroundTaskId)
+}
+```
+
+#### 2. **"Network Connection Lost" Message**
+
+This indicates the background session lost connection.
+
+**Solutions**:
+
+- The updated background session configuration now includes proper timeouts and connection settings
+- Use network monitoring to detect connection state changes
+- Implement retry logic for failed requests
+
+```swift
+// Use the background task manager for network operations
+try await backgroundTaskManager.performBackgroundNetworkOperation {
+    return try await openAIService.chatCompletion(request: request)
+}
+```
+
+#### 3. **Session Not Working**
+
+- Ensure your app has the correct background modes enabled in Info.plist
+- Verify that you've properly implemented the AppDelegate method for background session events
+
+#### 4. **Completion Handler Not Called**
+
+- Verify that you've properly implemented the AppDelegate method for background session events
+- Check that the session identifier matches between creation and AppDelegate handling
+
+#### 5. **Certificate Pinning Issues**
+
+- Background sessions use the same certificate pinning as regular sessions
+- The enhanced delegate now provides better error logging for debugging
+
+#### 6. **Network Timeouts**
+
+- Background requests now have proper timeout configurations (60s request, 300s resource)
+- Enhanced error handling provides specific timeout error messages
 
 ## Migration from Regular Services
 

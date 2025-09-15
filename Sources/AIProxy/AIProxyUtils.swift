@@ -34,6 +34,22 @@ enum AIProxyUtils {
         let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
         configuration.sessionSendsLaunchEvents = true
         configuration.isDiscretionary = false
+        
+        // Configure timeouts for background sessions
+        configuration.timeoutIntervalForRequest = 60.0
+        configuration.timeoutIntervalForResource = 300.0 // 5 minutes
+        
+        // Configure connection settings for background reliability
+        configuration.httpMaximumConnectionsPerHost = 2
+        configuration.httpShouldUsePipelining = true
+        
+        // Configure network service type for background tasks
+        configuration.networkServiceType = .background
+        
+        // Enable connection pooling and keep-alive
+        configuration.httpShouldSetCookies = true
+        configuration.httpCookieAcceptPolicy = .always
+        
         return URLSession(configuration: configuration)
     }
 
