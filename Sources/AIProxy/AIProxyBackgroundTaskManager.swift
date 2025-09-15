@@ -27,7 +27,9 @@ public class AIProxyBackgroundTaskManager {
     /// Starts a background task to keep the app alive during network operations
     #if canImport(UIKit)
     public func startBackgroundTask(name: String = "AIProxy Network Task") -> UIBackgroundTaskIdentifier {
-        let identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+        var identifier: UIBackgroundTaskIdentifier = .invalid
+        
+        identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             self?.endBackgroundTask(identifier: identifier)
         }
         
