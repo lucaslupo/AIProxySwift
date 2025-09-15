@@ -32,13 +32,12 @@ open class OpenAIBackgroundProxiedService: OpenAIService, BackgroundProxiedServi
         let requestBuilder = OpenAIProxiedRequestBuilder(
             partialKey: partialKey,
             serviceURL: self.serviceURL,
-            clientID: clientID,
-            requestFormat: requestFormat
+            clientID: clientID
         )
         super.init(
             requestFormat: requestFormat,
             requestBuilder: requestBuilder,
-            serviceNetworker: BackgroundNetworker()
+            serviceNetworker: OpenAIProxiedServiceNetworker()
         )
     }
 }
