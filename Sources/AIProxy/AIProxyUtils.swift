@@ -29,6 +29,29 @@ enum AIProxyUtils {
     static func directURLSession() -> URLSession {
         return URLSession(configuration: .ephemeral)
     }
+    
+    static func directBackgroundURLSession(identifier: String = "com.aiproxy.direct.background") -> URLSession {
+        let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
+        configuration.sessionSendsLaunchEvents = true
+        configuration.isDiscretionary = false
+        
+        // Configure timeouts for background sessions
+        configuration.timeoutIntervalForRequest = 60.0
+        configuration.timeoutIntervalForResource = 300.0 // 5 minutes
+        
+        // Configure connection settings for background reliability
+        configuration.httpMaximumConnectionsPerHost = 2
+        configuration.httpShouldUsePipelining = true
+        
+        // Configure network service type for background tasks
+        configuration.networkServiceType = .background
+        
+        // Enable connection pooling and keep-alive
+        configuration.httpShouldSetCookies = true
+        configuration.httpCookieAcceptPolicy = .always
+        
+        return URLSession(configuration: configuration)
+    }
 
     static func proxiedURLSession() -> URLSession {
         if AIProxyConfiguration.resolveDNSOverTLS {
@@ -45,6 +68,23 @@ enum AIProxyUtils {
             )
         }
         return AIProxyURLSession.create()
+    }
+    
+    static func proxiedBackgroundURLSession(identifier: String = "com.aiproxy.proxied.background") -> URLSession {
+        if AIProxyConfiguration.resolveDNSOverTLS {
+            let host = NWEndpoint.hostPort(host: "one.one.one.one", port: 853)
+            let endpoints: [NWEndpoint] = [
+                .hostPort(host: "1.1.1.1", port: 853),
+                .hostPort(host: "1.0.0.1", port: 853),
+                .hostPort(host: "2606:4700:4700::1111", port: 853),
+                .hostPort(host: "2606:4700:4700::1001", port: 853)
+            ]
+            NWParameters.PrivacyContext.default.requireEncryptedNameResolution(
+                true,
+                fallbackResolver: .tls(host, serverAddresses: endpoints)
+            )
+        }
+        return AIProxyURLSession.createBackgroundSession(identifier: identifier)
     }
 
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)

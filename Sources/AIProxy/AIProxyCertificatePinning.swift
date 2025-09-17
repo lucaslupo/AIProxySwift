@@ -7,6 +7,10 @@
 
 import Foundation
 
+#if canImport(Network)
+import Network
+#endif
+
 /// ## About
 /// Use this class in conjunction with a URLSession to adopt certificate pinning in your app.
 /// Cert pinning greatly reduces the ability for an attacker to snoop on your traffic.
@@ -50,7 +54,82 @@ import Foundation
 /// If you encounter other calls in the wild that do not invoke `urlSession:didReceiveChallenge:` on this class,
 /// please report them to me.
 open class AIProxyCertificatePinningDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
+    
+    /// Completion handler for background session events
+    public var backgroundCompletionHandler: (() -> Void)?
+    
+    /// Network state monitoring
+    #if canImport(Network)
+    private let networkMonitor = NWPathMonitor()
+    #endif
+    private var isNetworkAvailable = true
+    
+    public override init() {
+        super.init()
+        #if canImport(Network)
+        startNetworkMonitoring()
+        #endif
+    }
+    
+    deinit {
+        #if canImport(Network)
+        networkMonitor.cancel()
+        #endif
+    }
+    
+    #if canImport(Network)
+    private func startNetworkMonitoring() {
+        networkMonitor.pathUpdateHandler = { [weak self] (path: NWPath) in
+            DispatchQueue.main.async {
+                self?.isNetworkAvailable = path.status == .satisfied
+                if path.status == .satisfied {
+                    logIf(.debug)?.debug("Network connection restored")
+                } else {
+                    logIf(.debug)?.debug("Network connection lost")
+                }
+            }
+        }
+        networkMonitor.start(queue: DispatchQueue.global(qos: .background))
+    }
+    #endif
 
+    private var dataMap = [Int: Data]() // track data per task
+
+    public func urlSession(_ session: URLSession,
+                               dataTask: URLSessionDataTask,
+                               didReceive data: Data) {
+            let taskId = dataTask.taskIdentifier
+            if dataMap[taskId] == nil { dataMap[taskId] = Data() }
+            dataMap[taskId]?.append(data)
+        }
+
+        public func urlSession(_ session: URLSession,
+                               task: URLSessionTask,
+                               didCompleteWithError error: Error?) {
+            let taskId = task.taskIdentifier
+            if let error = error {
+                logIf(.error)?.error("Task \(taskId) failed: \(error.localizedDescription)")
+                
+                // Handle specific network errors
+                if let urlError = error as? URLError {
+                    switch urlError.code {
+                    case .networkConnectionLost, .notConnectedToInternet:
+                        logIf(.error)?.error("Network connection lost for task \(taskId)")
+                    case .timedOut:
+                        logIf(.error)?.error("Request timed out for task \(taskId)")
+                    case .cannotConnectToHost:
+                        logIf(.error)?.error("Cannot connect to host for task \(taskId)")
+                    default:
+                        logIf(.error)?.error("URL error for task \(taskId): \(urlError.localizedDescription)")
+                    }
+                }
+            } else if let data = dataMap[taskId] {
+                // Process the response data for this task
+                logIf(.debug)?.debug("Task \(taskId) completed successfully, received \(data.count) bytes")
+            }
+            dataMap[taskId] = nil
+        }
+    
    public var progressCallback: ((Double) -> Void)?
    
    public func setProgressCallback(_ callback: @escaping (Double) -> Void) {
@@ -87,6 +166,15 @@ open class AIProxyCertificatePinningDelegate: NSObject, URLSessionDelegate, URLS
              totalBytesExpectedToSend > 0 else { return }
        let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
        progressCallback(progress)
+   }
+   
+   // MARK: - Background Session Support
+   
+   public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+       DispatchQueue.main.async {
+           self.backgroundCompletionHandler?()
+           self.backgroundCompletionHandler = nil
+       }
    }
 
    private func answerChallenge(

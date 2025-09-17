@@ -1020,5 +1020,54 @@ public enum AIProxy {
         // print(data)
         return data
     }
+    
+    // MARK: - Background Service Factory Methods
+    
+    /// Creates a background-capable OpenAI service that can make requests when the app is in the background
+    ///
+    /// - Parameters:
+    ///   - partialKey: Your partial key from AIProxy dashboard
+    ///   - serviceURL: The service URL from AIProxy dashboard
+    ///   - backgroundSessionIdentifier: Unique identifier for the background session
+    ///   - clientID: Optional client ID for attribution
+    ///   - requestFormat: Request format (standard or JSON mode)
+    /// - Returns: An instance of OpenAIService configured for background execution
+    public static func openAIBackgroundService(
+        partialKey: String,
+        serviceURL: String? = nil,
+        backgroundSessionIdentifier: String,
+        clientID: String? = nil,
+        requestFormat: OpenAIRequestFormat = .standard
+    ) -> OpenAIService {
+        return OpenAIBackgroundProxiedService(
+            partialKey: partialKey,
+            serviceURL: serviceURL,
+            clientID: clientID,
+            requestFormat: requestFormat,
+            backgroundSessionIdentifier: backgroundSessionIdentifier
+        )
+    }
+    
+    /// Creates a background-capable Anthropic service that can make requests when the app is in the background
+    ///
+    /// - Parameters:
+    ///   - partialKey: Your partial key from AIProxy dashboard
+    ///   - serviceURL: The service URL from AIProxy dashboard
+    ///   - backgroundSessionIdentifier: Unique identifier for the background session
+    ///   - clientID: Optional client ID for attribution
+    /// - Returns: An instance of AnthropicService configured for background execution
+    public static func anthropicBackgroundService(
+        partialKey: String,
+        serviceURL: String,
+        backgroundSessionIdentifier: String,
+        clientID: String? = nil
+    ) -> AnthropicService {
+        return AnthropicBackgroundProxiedService(
+            partialKey: partialKey,
+            serviceURL: serviceURL,
+            clientID: clientID,
+            backgroundSessionIdentifier: backgroundSessionIdentifier
+        )
+    }
 
 }
